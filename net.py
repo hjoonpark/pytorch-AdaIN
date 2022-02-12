@@ -1,3 +1,4 @@
+from re import S
 import torch.nn as nn
 
 from function import adaptive_instance_normalization as adain
@@ -104,9 +105,9 @@ class Net(nn.Module):
         self.mse_loss = nn.MSELoss()
 
         # fix the encoder
-        for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4']:
-            for param in getattr(self, name).parameters():
-                param.requires_grad = False
+        # for name in ['enc_1', 'enc_2', 'enc_3', 'enc_4']:
+        #     for param in getattr(self, name).parameters():
+        #         param.requires_grad = False
 
     # extract relu1_1, relu2_1, relu3_1, relu4_1 from input image
     def encode_with_intermediate(self, input):
@@ -124,12 +125,12 @@ class Net(nn.Module):
 
     def calc_content_loss(self, input, target):
         assert (input.size() == target.size())
-        assert (target.requires_grad is False)
+        # assert (target.requires_grad is False)
         return self.mse_loss(input, target)
 
     def calc_style_loss(self, input, target):
         assert (input.size() == target.size())
-        assert (target.requires_grad is False)
+        # assert (target.requires_grad is False)
         input_mean, input_std = calc_mean_std(input)
         target_mean, target_std = calc_mean_std(target)
         return self.mse_loss(input_mean, target_mean) + \
@@ -137,13 +138,24 @@ class Net(nn.Module):
 
     def forward(self, content, style, alpha=1.0):
         assert 0 <= alpha <= 1
+        self.content = content
+        self.style = style
         style_feats = self.encode_with_intermediate(style)
         content_feat = self.encode(content)
         t = adain(content_feat, style_feats[-1])
         t = alpha * t + (1 - alpha) * content_feat
 
-        g_t = self.decoder(t)
-        g_t_feats = self.encode_with_intermediate(g_t)
+        self.g_t = self.decoder(t)
+        g_t_feats = self.encode_with_intermediate(self.g_t)
+
+        # print("content:", content.shape, ", style:", style.shape)
+        # print("con_fea:", content_feat.shape, ", sty_fea:")
+        # for sss in style_feats:
+        #     print("\t", sss.shape)
+        # print("t:", t.shape, ', gt:', self.g_t.shape, ', g_t_feat:')
+        # for sss in style_feats:
+        #     print("\t", sss.shape)
+        # print()
 
         loss_c = self.calc_content_loss(g_t_feats[-1], t)
         loss_s = self.calc_style_loss(g_t_feats[0], style_feats[0])
